@@ -1,5 +1,5 @@
 # Genius Hub Component (Platform) for Home Assistant
-Here's an integration of Genius Hub (HeatGenius) with Home Assistant (HASS).
+Here's an integration of Genius Hub (HeatGenius) with Home Assistant (HASS). This has been updated to use v1 of the pub API. The public API can be found here: https://my.geniushub.co.uk/login
 
 It works for reading the temperature from the Genius Hub. It does not currently support switches, motion, luminance or setting of temperature or changing any setting in the hub.
 
@@ -17,13 +17,11 @@ Now that the component is installed you will need to add the setup to you config
 ```
 climate:
   - platform: genius
-    host: xx.yy.zz.aa
     api_key: keep_this_secret
    
 ```
-Both **host** and **api_key** are mandatory. 
-**host** is the url of your Genius Hub on your local network
-**api_key** is the API Signature value that can be found in the Genius Hub UI on the about page.
+**api_key** is mandatory and is the token that can be obtained for your geniushub here: https://my.geniushub.co.uk/tokens
+
 
 ## More information
 More information about the Genius Hub can be found here: https://www.geniushub.co.uk/

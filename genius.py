@@ -13,60 +13,42 @@ from homeassistant.components.climate import (
 from homeassistant.const import TEMP_CELSIUS, ATTR_TEMPERATURE, CONF_HOST, CONF_API_KEY
 import homeassistant.helpers.config_validation as cv
 
-import json
-import requests
-
+from .utils import GeniusUtility
 
 SUPPORT_FLAGS = SUPPORT_TARGET_TEMPERATURE | SUPPORT_OPERATION_MODE | SUPPORT_ON_OFF
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
-    vol.Required(CONF_HOST): cv.string,
     vol.Required(CONF_API_KEY): cv.string,
 })
-
-HG_URL = "https://my.geniushub.co.uk/v1"
-
-
-def getjson(host, api_key, identifier):
-    """ gets the json from the supplied zone identifier """
-    url = host + identifier
-    try:
-        headers = {'Authorization': 'Bearer ' + api_key}
-        response = requests.get(url, headers=headers)
-
-        if response.status_code == 200:
-            return json.loads(response.text)
-
-    except Exception as ex:
-        print("Failed requests in getjsonfromhttp")
-        print(ex)
-        return None
 
 
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Set up the Demo climate devices."""
-    host = config.get(CONF_HOST)
     api_key = config.get(CONF_API_KEY)
 
-    zone_list = getjson(HG_URL, api_key, '/zones')
+    genius_utility = GeniusUtility(api_key)
+
+    # Get the zones with a temperature
+    zone_list = filter(lambda zone: 'temperature' in zone,
+                       genius_utility.getjson('/zones'))
 
     for zone in zone_list:
-        if 'temperature' in zone:
-            current_temperature = zone['temperature']
-            target_temperature = zone['setpoint']
-            name = zone['name']
-            id = zone['id']
-            mode = zone['mode']
+        current_temperature = zone['temperature']
+        target_temperature = zone['setpoint']
+        name = zone['name']
+        id = zone['id']
+        mode = zone['mode']
 
-            add_devices([GeniusDevice(name, id, mode,
-                                      target_temperature, current_temperature)])
+        add_devices([GeniusDevice(genius_utility, name, id, mode,
+                                  target_temperature, current_temperature)])
 
 
 class GeniusDevice(ClimateDevice):
     """Representation of a demo climate device."""
 
-    def __init__(self, name, device_id, mode, target_temperature, current_temperature):
+    def __init__(self, genius_utility, name, device_id, mode, target_temperature, current_temperature):
         """Initialize the climate device."""
+        self._genius_utility = genius_utility
         self._name = name
         self._support_flags = SUPPORT_FLAGS
         self._target_temperature = target_temperature
