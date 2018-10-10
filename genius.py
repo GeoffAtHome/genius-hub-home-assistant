@@ -1,134 +1,98 @@
-"""
-Genius hub platform that offers reading of current sensors.
 
-In the future this may be extended to change the sensors.
-
-"""
-
-import socket
+''' This module contains utility functions that are shared across other programs '''
+import json
+import requests
+import time
+import threading
+import logging
 import voluptuous as vol
 
-from homeassistant.components.climate import (
-    ClimateDevice, SUPPORT_TARGET_TEMPERATURE, SUPPORT_OPERATION_MODE, SUPPORT_ON_OFF, PLATFORM_SCHEMA)
-from homeassistant.const import TEMP_CELSIUS, ATTR_TEMPERATURE, CONF_HOST, CONF_API_KEY
-import homeassistant.helpers.config_validation as cv
+from homeassistant.const import CONF_API_KEY
+from homeassistant.helpers import config_validation as cv
 
-from .utils import GeniusUtility
+_LOGGER = logging.getLogger(__name__)
 
-SUPPORT_FLAGS = SUPPORT_TARGET_TEMPERATURE | SUPPORT_OPERATION_MODE | SUPPORT_ON_OFF
+GENIUS_LINK = 'genius_link'
+DOMAIN = 'genius'
 
-PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
-    vol.Required(CONF_API_KEY): cv.string,
-})
-
-
-def setup_platform(hass, config, add_devices, discovery_info=None):
-    """Set up the Demo climate devices."""
-    api_key = config.get(CONF_API_KEY)
-
-    genius_utility = GeniusUtility(api_key)
-
-    # Get the zones with a temperature
-    zone_list = filter(lambda zone: 'temperature' in zone,
-                       genius_utility.getjson('/zones'))
-
-    for zone in zone_list:
-        current_temperature = zone['temperature']
-        target_temperature = zone['setpoint']
-        name = zone['name']
-        id = zone['id']
-        mode = zone['mode']
-
-        add_devices([GeniusDevice(genius_utility, name, id, mode,
-                                  target_temperature, current_temperature)])
+CONFIG_SCHEMA = vol.Schema({
+    DOMAIN: vol.Schema({
+        vol.Required(CONF_API_KEY): cv.string,
+    })
+}, extra=vol.ALLOW_EXTRA)
 
 
-class GeniusDevice(ClimateDevice):
-    """Representation of a demo climate device."""
+async def async_setup(hass, config):
+    """Try to start embedded Lightwave broker."""
+    _LOGGER.info("Genius broker started!")
+    api_key = config[DOMAIN].get(CONF_API_KEY)
+    _LOGGER.info("Genius broker api key: " + api_key)
+    hass.data[GENIUS_LINK] = GeniusUtility(api_key)
+    _LOGGER.info("Genius  broker complete!")
+    return True
 
-    def __init__(self, genius_utility, name, device_id, mode, target_temperature, current_temperature):
-        """Initialize the climate device."""
-        self._genius_utility = genius_utility
-        self._name = name
-        self._support_flags = SUPPORT_FLAGS
-        self._target_temperature = target_temperature
-        self._unit_of_measurement = TEMP_CELSIUS
-        self._current_temperature = current_temperature
-        self._device_id = device_id
-        self._current_operation = mode
 
-        if self._current_operation == "off":
-            self._on = False
-        else:
-            self._on = True
+class GeniusUtility():
+    HG_URL = "https://my.geniushub.co.uk/v1"
+    UPDATE_INTERVAL = 15  # Interval between fetching new data from the Genius hub
+    _results = None
+    _lock = threading.Lock()
 
-        self._operation_list = ["off", "timer",
-                                "footprint", "away", "boost", "early"]
+    def __init__(self, key):
+        # Save the key
+        GeniusUtility._headers = {'Authorization': 'Bearer ' +
+                                  key, 'Content-Type': 'application/json'}
+        GeniusUtility._t = threading.Thread(target=self.Polling, name="t1")
+        GeniusUtility._t.daemon = True
+        GeniusUtility._t.start()
 
-    @property
-    def supported_features(self):
-        """Return the list of supported features."""
-        return self._support_flags
+    def _getjson(self, identifier):
+        ''' gets the json from the supplied zone identifier '''
+        url = GeniusUtility.HG_URL + identifier
+        try:
+            response = requests.get(url, headers=GeniusUtility._headers)
 
-    @property
-    def name(self):
-        """Return the name of the climate device."""
-        return self._name
+            if response.status_code == 200:
+                results = json.loads(response.text)
+                with GeniusUtility._lock:
+                    GeniusUtility._results = results
 
-    @property
-    def temperature_unit(self):
-        """Return the unit of measurement."""
-        return self._unit_of_measurement
+        except Exception as ex:
+            print("Failed requests in _getjson")
+            print(ex)
+            return None
 
-    @property
-    def current_temperature(self):
-        """Return the current temperature."""
-        return self._current_temperature
+    def Polling(self):
+        while True:
+            self._getjson('/zones')
+            time.sleep(GeniusUtility.UPDATE_INTERVAL)
 
-    @property
-    def target_temperature(self):
-        """Return the temperature we try to reach."""
-        return self._target_temperature
+    def getZone(self, zoneId):
+        results = self.getAllZones()
+        for item in results:
+            if item['id'] == zoneId:
+                return item
 
-    @property
-    def current_operation(self):
-        """Return current operation ie. heat, cool, idle."""
-        return self._current_operation
+        return None
 
-    @property
-    def operation_list(self):
-        """Return the list of available operation modes."""
-        return self._operation_list
+    def getAllZones(self):
+        results = None
+        with GeniusUtility._lock:
+            results = GeniusUtility._results
 
-    @property
-    def is_on(self):
-        """Return true if the device is on."""
-        return self._on
+        return results
 
-    def set_temperature(self, **kwargs):
-        """Set new target temperatures."""
-        if kwargs.get(ATTR_TEMPERATURE) is not None:
-            self._target_temperature = kwargs.get(ATTR_TEMPERATURE)
-        self.schedule_update_ha_state()
+    def putjson(self, identifier, data):
+        ''' puts the json data to the supplied zone identifier '''
+        url = GeniusUtility.HG_URL + identifier
+        try:
+            response = requests.put(
+                url, headers=GeniusUtility._headers, data=json.dumps(data))
+            ''' refresh the results '''
+            self._getjson('/zones')
+            return response.status_code == 200
 
-    def set_operation_mode(self, operation_mode):
-        """Set new target temperature."""
-        self._current_operation = operation_mode
-        self.schedule_update_ha_state()
-
-    def update(self):
-        """Get the latest date."""
-        ''' self._current_temperature, self._target_temperature, mode = self._genius_utility.GET_TEMPERATURE(
-            self._key)
-        self._current_operation = self._genius_utility.GET_MODE(mode) '''
-        self.schedule_update_ha_state()
-
-    def turn_on(self):
-        """Turn on."""
-        self._on = True
-        self.schedule_update_ha_state()
-
-    def turn_off(self):
-        """Turn off."""
-        self._on = False
-        self.schedule_update_ha_state()
+        except Exception as ex:
+            print("Failed requests in putjson")
+            print(ex)
+            return False
