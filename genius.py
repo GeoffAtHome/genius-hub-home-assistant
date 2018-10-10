@@ -88,9 +88,9 @@ class GeniusUtility():
             async with session.put(url, headers=GeniusUtility._headers, data=json.dumps(data)) as response:
                 assert response.status == 200
 
-    async def putjson(self, identifier, data):
+    async def putjson(self, device_id, identifier, data):
         ''' puts the json data to the supplied zone identifier '''
-        url = GeniusUtility.HG_URL + identifier
+        url = GeniusUtility.HG_URL + '/zones/' + str(device_id) + identifier
         try:
             async with aiohttp.ClientSession() as session:
                 status = await self.place(session, url, data)

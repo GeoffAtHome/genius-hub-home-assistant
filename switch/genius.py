@@ -64,10 +64,8 @@ class GeniusSwitch(SwitchDevice):
 
     async def async_turn_on(self, **kwargs):
         """ Turn the Genius switch on. """
-        await GeniusSwitch._genius_utility.putjson(
-            '/zones/' + str(self._device_id) + '/mode', "override")
+        await GeniusSwitch._genius_utility.putjson(self._device_id, '/mode', "override")
 
     async def async_turn_off(self, **kwargs):
         """ Turn the Genius switch off. """
-        await GeniusSwitch._genius_utility.putjson(
-            '/zones/' + str(self._device_id) + '/mode', "off")
+        await GeniusSwitch._genius_utility.putjson(self._device_id, '/mode', "off")
