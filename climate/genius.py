@@ -26,10 +26,8 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     """Set up the Demo climate devices."""
     genius_utility = hass.data[GENIUS_LINK]
 
-    while True:
-        zones = genius_utility.getAllZones()
-        if zones is not None:
-            break
+    await genius_utility.getjson('/zones')
+    zones = genius_utility.getAllZones()
 
     # Get the zones with a temperature
     zone_list = filter(lambda zone: 'temperature' in zone, zones)

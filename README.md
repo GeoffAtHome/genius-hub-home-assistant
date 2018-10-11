@@ -19,6 +19,7 @@ Now that the component is installed you will need to add the setup to you config
 ```
 genius:
   api_key: keep_this_secret
+  scan_interval: seconds
 
 climate:
   - platform: genius
@@ -28,6 +29,8 @@ switch:
    
 ```
 **api_key** is mandatory and is the token that can be obtained for your geniushub here: https://my.geniushub.co.uk/tokens
+
+**scan_interval** is optional. If missing the default scan_interval is 6 seconds between polling the hub for an update
 
 
 ## More information

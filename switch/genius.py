@@ -16,10 +16,9 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     """ Find and return Genius switches """
     switches = []
     genius_utility = hass.data[GENIUS_LINK]
-    while True:
-        zones = genius_utility.getAllZones()
-        if zones is not None:
-            break
+
+    await genius_utility.getjson('/zones')
+    zones = genius_utility.getAllZones()
 
     # Get the zones that are switches
     zone_list = filter(lambda zone: zone['type'] == 'on / off', zones)

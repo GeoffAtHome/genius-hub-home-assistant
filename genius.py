@@ -7,7 +7,7 @@ import threading
 import logging
 import voluptuous as vol
 
-from homeassistant.const import CONF_API_KEY
+from homeassistant.const import (CONF_API_KEY, CONF_SCAN_INTERVAL)
 from homeassistant.helpers import config_validation as cv
 
 _LOGGER = logging.getLogger(__name__)
@@ -18,36 +18,42 @@ DOMAIN = 'genius'
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
         vol.Required(CONF_API_KEY): cv.string,
-    })
+        vol.Optional(CONF_SCAN_INTERVAL, default=6): cv.positive_int,
+    }),
 }, extra=vol.ALLOW_EXTRA)
 
 
 async def async_setup(hass, config):
     """Try to start embedded Lightwave broker."""
     api_key = config[DOMAIN].get(CONF_API_KEY)
-    hass.data[GENIUS_LINK] = GeniusUtility(api_key)
+    scan_interval = config[DOMAIN].get(CONF_SCAN_INTERVAL)
+    hass.data[GENIUS_LINK] = GeniusUtility(api_key, scan_interval)
     return True
 
 
 class GeniusUtility():
     HG_URL = "https://my.geniushub.co.uk/v1"
-    UPDATE_INTERVAL = 5  # Interval between fetching new data from the Genius hub
+    _UPDATE_INTERVAL = 5  # Interval between fetching new data from the Genius hub
     _results = []
 
-    def __init__(self, key):
+    def __init__(self, key, update=5):
         # Save the key
         GeniusUtility._headers = {'Authorization': 'Bearer ' +
                                   key, 'Content-Type': 'application/json'}
 
+        GeniusUtility._UPDATE_INTERVAL = update
+        GeniusUtility._STATUS = 200
         GeniusUtility._t = threading.Thread(
-            target=self.StartPolling, name="t1")
+            target=self.StartPolling, name="GeniusInitLink")
         GeniusUtility._t.daemon = True
         GeniusUtility._t.start()
 
     async def fetch(self, session, url):
         async with aiohttp.ClientSession() as session:
             async with session.get(url, headers=GeniusUtility._headers) as response:
-                return await response.text()
+                text = await response.text()
+                GeniusUtility._STATUS = response.status
+                return text
 
     async def getjson(self, identifier):
         ''' gets the json from the supplied zone identifier '''
@@ -70,8 +76,23 @@ class GeniusUtility():
     async def Polling(self):
         while True:
             await self.getjson('/zones')
+
+            if not GeniusUtility._STATUS == 200:
+                _LOGGER.info(self.LookupStatusError(GeniusUtility._STATUS))
+                if GeniusUtility._STATUS == 501:
+                    break
+
             print("Sleeping")
-            await asyncio.sleep(GeniusUtility.UPDATE_INTERVAL)
+            await asyncio.sleep(GeniusUtility._UPDATE_INTERVAL)
+
+    def LookupStatusError(self, status):
+        return {
+            400: "400 The request body or request parameters are invalid.",
+            401: "401 The authorization information is missing or invalid.",
+            404: "404 No zone with the specified ID was not found.",
+            502: "502 The hub is offline.",
+            503: "503 The authorization information invalid.",
+        }.get(status, str(status) + " Unknown status")
 
     def getZone(self, zoneId):
         for item in GeniusUtility._results:
@@ -100,6 +121,7 @@ class GeniusUtility():
             return status == 200
 
         except Exception as ex:
+            _LOGGER.info(self.LookupStatusError(GeniusUtility._STATUS))
             _LOGGER.info("Failed requests in putjson")
             _LOGGER.info(ex)
             return False
