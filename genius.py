@@ -52,17 +52,18 @@ class GeniusUtility():
         async with aiohttp.ClientSession() as session:
             async with session.get(url, headers=GeniusUtility._headers) as response:
                 text = await response.text()
-                GeniusUtility._STATUS = response.status
-                return text
+                return text, response.status
 
     async def getjson(self, identifier):
         ''' gets the json from the supplied zone identifier '''
         url = GeniusUtility.HG_URL + identifier
         try:
             async with aiohttp.ClientSession() as session:
-                text = await self.fetch(session, url)
+                text, status = await self.fetch(session, url)
+                GeniusUtility._STATUS = status
 
-                GeniusUtility._results = json.loads(text)
+                if status == 200:
+                    GeniusUtility._results = json.loads(text)
 
         except Exception as ex:
             _LOGGER.info("Failed requests in getjson")
@@ -82,7 +83,6 @@ class GeniusUtility():
                 if GeniusUtility._STATUS == 501:
                     break
 
-            print("Sleeping")
             await asyncio.sleep(GeniusUtility._UPDATE_INTERVAL)
 
     def LookupStatusError(self, status):
