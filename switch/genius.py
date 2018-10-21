@@ -16,16 +16,15 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     """ Find and return Genius switches """
     switches = []
     genius_utility = hass.data[GENIUS_LINK]
-
     await genius_utility.getjson('/zones')
-    zones = genius_utility.getAllZones()
 
     # Get the zones that are switches
-    zone_list = filter(lambda zone: zone['type'] == 'on / off', zones)
+    switch_list = filter(
+        lambda item: item['iType'] == 2, genius_utility.getAllZones())
 
-    for switch in zone_list:
-        switches.append(
-            GeniusSwitch(genius_utility, switch['id'], switch['name'], switch['mode']))
+    for zone in switch_list:
+        switch_id, name, mode = genius_utility.GET_SWITCH(zone)
+        switches.append(GeniusSwitch(genius_utility, switch_id, name, mode))
 
     async_add_entities(switches)
 
@@ -54,17 +53,18 @@ class GeniusSwitch(SwitchDevice):
 
     async def async_update(self):
         """Get the latest data."""
-        data = GeniusSwitch._genius_utility.getZone(self._device_id)
-        if data:
-            if data['mode'] == 'off':
+        zone = GeniusSwitch._genius_utility.getZone(self._device_id)
+        if zone:
+            mode = self.genius_utility.GET_MODE(zone)
+            if mode == 'off':
                 self._state = False
             else:
                 self._state = True
 
     async def async_turn_on(self, **kwargs):
         """ Turn the Genius switch on. """
-        await GeniusSwitch._genius_utility.putjson(self._device_id, '/mode', "override")
+        await GeniusSwitch._genius_utility.putjson(self._device_id, {"fBoostSP": 1, "iBoostTimeRemaining": 900, "iMode": 16})
 
     async def async_turn_off(self, **kwargs):
         """ Turn the Genius switch off. """
-        await GeniusSwitch._genius_utility.putjson(self._device_id, '/mode', "off")
+        await GeniusSwitch._genius_utility.putjson(self._device_id, {"iMode": 1})

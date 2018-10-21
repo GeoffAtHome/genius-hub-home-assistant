@@ -1,13 +1,15 @@
 
 ''' This module contains utility functions that are shared across other programs '''
 import json
+from hashlib import sha256 as hash
 import aiohttp
 import asyncio
 import threading
 import logging
 import voluptuous as vol
 
-from homeassistant.const import (CONF_API_KEY, CONF_SCAN_INTERVAL)
+from homeassistant.const import (
+    CONF_HOST, CONF_PASSWORD, CONF_USERNAME, CONF_SCAN_INTERVAL)
 from homeassistant.helpers import config_validation as cv
 
 _LOGGER = logging.getLogger(__name__)
@@ -17,7 +19,9 @@ DOMAIN = 'genius'
 
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
-        vol.Required(CONF_API_KEY): cv.string,
+        vol.Required(CONF_USERNAME): cv.string,
+        vol.Required(CONF_PASSWORD): cv.string,
+        vol.Required(CONF_HOST): cv.string,
         vol.Optional(CONF_SCAN_INTERVAL, default=6): cv.positive_int,
     }),
 }, extra=vol.ALLOW_EXTRA)
@@ -25,24 +29,27 @@ CONFIG_SCHEMA = vol.Schema({
 
 async def async_setup(hass, config):
     """Try to start embedded Lightwave broker."""
-    api_key = config[DOMAIN].get(CONF_API_KEY)
+    username = config[DOMAIN].get(CONF_USERNAME)
+    password = config[DOMAIN].get(CONF_PASSWORD)
+    host = config[DOMAIN].get(CONF_HOST)
     scan_interval = config[DOMAIN].get(CONF_SCAN_INTERVAL)
-    hass.data[GENIUS_LINK] = GeniusUtility(api_key, scan_interval)
+    hass.data[GENIUS_LINK] = GeniusUtility(
+        host, username, password, scan_interval)
     return True
 
 
 class GeniusUtility():
-    HG_URL = "https://my.geniushub.co.uk/v1"
-    _UPDATE_INTERVAL = 5  # Interval between fetching new data from the Genius hub
-    _results = []
 
-    def __init__(self, key, update=5):
-        # Save the key
-        GeniusUtility._headers = {'Authorization': 'Bearer ' +
-                                  key, 'Content-Type': 'application/json'}
-
+    def __init__(self, ip_address, username, password, update=5):
+        ''' if the ip_address == None we assume that the new public API should be used
+            if the ip_address is supplied we will use it with the non-public API'''
+        sha = hash()
+        sha.update((username + password).encode('utf-8'))
+        GeniusUtility._auth = aiohttp.BasicAuth(
+            login=username, password=sha.hexdigest())
         GeniusUtility._UPDATE_INTERVAL = update
         GeniusUtility._STATUS = 200
+        GeniusUtility._ip_address = "http://" + ip_address + ":1223/v3"
         GeniusUtility._t = threading.Thread(
             target=self.StartPolling, name="GeniusInitLink")
         GeniusUtility._t.daemon = True
@@ -50,13 +57,13 @@ class GeniusUtility():
 
     async def fetch(self, session, url):
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=GeniusUtility._headers) as response:
+            async with session.get(url, auth=GeniusUtility._auth) as response:
                 text = await response.text()
                 return text, response.status
 
     async def getjson(self, identifier):
         ''' gets the json from the supplied zone identifier '''
-        url = GeniusUtility.HG_URL + identifier
+        url = GeniusUtility._ip_address + identifier
         try:
             async with aiohttp.ClientSession() as session:
                 text, status = await self.fetch(session, url)
@@ -85,6 +92,16 @@ class GeniusUtility():
 
             await asyncio.sleep(GeniusUtility._UPDATE_INTERVAL)
 
+    def getAllZones(self):
+        return GeniusUtility._results['data']
+
+    def getZone(self, zoneId):
+        for item in GeniusUtility.getAllZones(self):
+            if item['iID'] == zoneId:
+                return item
+
+        return None
+
     def LookupStatusError(self, status):
         return {
             400: "400 The request body or request parameters are invalid.",
@@ -94,24 +111,15 @@ class GeniusUtility():
             503: "503 The authorization information invalid.",
         }.get(status, str(status) + " Unknown status")
 
-    def getZone(self, zoneId):
-        for item in GeniusUtility._results:
-            if item['id'] == zoneId:
-                return item
-
-        return None
-
-    def getAllZones(self):
-        return GeniusUtility._results
-
     async def place(self, session, url, data):
         async with aiohttp.ClientSession() as session:
-            async with session.put(url, headers=GeniusUtility._headers, data=json.dumps(data)) as response:
+            async with session.patch(url, auth=GeniusUtility._auth, data=json.dumps(data)) as response:
                 assert response.status == 200
+                return response.status
 
-    async def putjson(self, device_id, identifier, data):
+    async def putjson(self, device_id, data):
         ''' puts the json data to the supplied zone identifier '''
-        url = GeniusUtility.HG_URL + '/zones/' + str(device_id) + identifier
+        url = GeniusUtility._ip_address + '/zone/' + str(device_id)
         try:
             async with aiohttp.ClientSession() as session:
                 status = await self.place(session, url, data)
@@ -125,3 +133,33 @@ class GeniusUtility():
             _LOGGER.info("Failed requests in putjson")
             _LOGGER.info(ex)
             return False
+
+    @staticmethod
+    def GET_CLIMATE(zone):
+        current_temperature = None
+        set_temperature = None
+        for device in zone['datapoints']:
+            if device['addr'] == 'HEATING_1':
+                set_temperature = device['val']
+            elif device['addr'] == 'TEMPERATURE':
+                current_temperature = device['val']
+        return zone['iID'], zone['strName'], current_temperature, set_temperature, GeniusUtility.GET_MODE(zone)
+
+    @staticmethod
+    def GET_SWITCH(zone):
+        return zone['iID'], zone['strName'], GeniusUtility.GET_MODE(zone)
+
+    @staticmethod
+    def GET_MODE(zone):
+        # Mode_Off: 1,
+        # Mode_Timer: 2,
+        # Mode_Footprint: 4,
+        # Mode_Away: 8,
+        # Mode_Boost: 16,
+        # Mode_Early: 32,
+        # Mode_Test: 64,
+        # Mode_Linked: 128,
+        # Mode_Other: 256
+        mode_map = {1: "off", 2: "timer", 4: "footprint",
+                    8: "away", 16: "boost", 32: "early", }
+        return mode_map.get(zone['iMode'], "off")

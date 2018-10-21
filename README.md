@@ -1,5 +1,6 @@
 # Genius Hub Component (Platform) for Home Assistant
-Here's an integration of Genius Hub (HeatGenius) with Home Assistant (HASS). This has been updated to use v1 of the pub API. The public API can be found here: https://my.geniushub.co.uk/login
+Here's an integration of Genius Hub (HeatGenius) with Home Assistant (HASS). 
+I have reverted to using the non-public API. This is because I would prefer to talk directly to the hub which is both faster and available when I have an internet outage. This also means, after a firmware update on the hub this component may fail as it did in an earlier version.
 
 It works for reading the temperature from the Genius Hub. Support for switches is included. It does not currently support motion, luminance or setting of temperature or changing any setting in the hub.
 
@@ -18,7 +19,9 @@ Now that the component is installed you will need to add the setup to you config
 
 ```
 genius:
-  api_key: keep_this_secret
+  username: user_name
+  password: keep_this_secret
+  host: local_ip_address
   scan_interval: seconds
 
 climate:
@@ -28,10 +31,21 @@ switch:
   - platform: genius
    
 ```
-**api_key** is mandatory and is the token that can be obtained for your geniushub here: https://my.geniushub.co.uk/tokens
+**username** is mandatory and is the username required to log into your Genius Hub
+
+**password** is mandatory and is the password required to log into your Genius Hub
+
+**host** is mandatory and is the local ip address to Genius Hub e.g. 192.168.1.2
 
 **scan_interval** is optional. If missing the default scan_interval is 6 seconds between polling the hub for an update
 
 
 ## More information
 More information about the Genius Hub can be found here: https://www.geniushub.co.uk/
+
+## TO DO
+1. Resolve issues in climate for switch between off, timer, boost and footprint so this works with Alexa
+2. Resolve changes to setpoint temperates received from hass
+3. Create docker installer
+
+Feel free to fork, help and improve
