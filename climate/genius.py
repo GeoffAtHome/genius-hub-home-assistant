@@ -152,7 +152,7 @@ class GeniusClimate(ClimateDevice):
         _LOGGER.info("GeniusClimate update called!")
         zone = GeniusClimate._genius_utility.getZone(self._device_id)
         if zone:
-            dummy, dummy2, self.current_temperature, self.set_temperature, self._mode = GeniusClimate._genius_utility.GET_CLIMATE(
+            dummy, dummy, self._current_temperature, self._set_temperature, self._mode = GeniusClimate._genius_utility.GET_CLIMATE(
                 zone)
             if self._mode == "off":
                 self._on = False
