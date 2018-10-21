@@ -55,7 +55,7 @@ class GeniusSwitch(SwitchDevice):
         """Get the latest data."""
         zone = GeniusSwitch._genius_utility.getZone(self._device_id)
         if zone:
-            mode = self.genius_utility.GET_MODE(zone)
+            mode = GeniusSwitch._genius_utility.GET_MODE(zone)
             if mode == 'off':
                 self._state = False
             else:
@@ -63,7 +63,7 @@ class GeniusSwitch(SwitchDevice):
 
     async def async_turn_on(self, **kwargs):
         """ Turn the Genius switch on. """
-        await GeniusSwitch._genius_utility.putjson(self._device_id, {"fBoostSP": 1, "iBoostTimeRemaining": 900, "iMode": 16})
+        await GeniusSwitch._genius_utility.putjson(self._device_id, {"fBoostSP": 1, "iBoostTimeRemaining": duration, "iMode": 16})
 
     async def async_turn_off(self, **kwargs):
         """ Turn the Genius switch off. """
