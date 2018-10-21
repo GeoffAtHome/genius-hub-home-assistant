@@ -63,6 +63,7 @@ class GeniusSwitch(SwitchDevice):
 
     async def async_turn_on(self, **kwargs):
         """ Turn the Genius switch on. """
+        duration = 24 * 60 * 60 # 24 hours in seconds
         await GeniusSwitch._genius_utility.putjson(self._device_id, {"fBoostSP": 1, "iBoostTimeRemaining": duration, "iMode": 16})
 
     async def async_turn_off(self, **kwargs):
