@@ -136,14 +136,10 @@ class GeniusUtility():
 
     @staticmethod
     def GET_CLIMATE(zone):
-        current_temperature = None
-        set_temperature = None
-        for device in zone['datapoints']:
-            if device['addr'] == 'HEATING_1':
-                set_temperature = device['val']
-            elif device['addr'] == 'TEMPERATURE':
-                current_temperature = device['val']
-        return zone['iID'], zone['strName'], current_temperature, set_temperature, GeniusUtility.GET_MODE(zone)
+        set_temperature = zone["fSP"]
+        current_temperature = zone['fPV']
+        is_active = zone['bIsActive']
+        return zone['iID'], zone['strName'], current_temperature, set_temperature, GeniusUtility.GET_MODE(zone), is_active
 
     @staticmethod
     def GET_SWITCH(zone):

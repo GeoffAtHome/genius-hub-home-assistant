@@ -8,7 +8,7 @@ import logging
 import voluptuous as vol
 
 from homeassistant.components.climate import (
-    ClimateDevice, STATE_ECO, STATE_HEAT, STATE_MANUAL, STATE_OFF, STATE_ON, SUPPORT_TARGET_TEMPERATURE, SUPPORT_OPERATION_MODE, SUPPORT_ON_OFF)
+    ClimateDevice, STATE_ECO, STATE_HEAT, STATE_AUTO, STATE_IDLE, STATE_OFF, STATE_ON, SUPPORT_TARGET_TEMPERATURE, SUPPORT_OPERATION_MODE, SUPPORT_ON_OFF, SUPPORT_AWAY_MODE)
 
 
 from homeassistant.const import TEMP_CELSIUS, ATTR_TEMPERATURE
@@ -16,10 +16,26 @@ from homeassistant.const import TEMP_CELSIUS, ATTR_TEMPERATURE
 _LOGGER = logging.getLogger(__name__)
 GENIUS_LINK = 'genius_link'
 
-SUPPORT_FLAGS = SUPPORT_TARGET_TEMPERATURE | SUPPORT_OPERATION_MODE | SUPPORT_ON_OFF
-# OPERATION_LIST = [STATE_HEAT, STATE_ECO, STATE_MANUAL, STATE_OFF, STATE_ON]
-OPERATION_LIST = ['idle', 'cool', 'heat']
-# OPERATION_LIST = ["AUTO", "COOL", "ECO", "HEAT", "OFF"]
+SUPPORT_FLAGS = SUPPORT_TARGET_TEMPERATURE | SUPPORT_OPERATION_MODE | SUPPORT_ON_OFF | SUPPORT_AWAY_MODE
+# Genius supports the operation modes: Off, Override, Footprint and Timer
+# To work with Alexa these MUST BE
+#
+#   climate.STATE_HEAT: 'HEAT',
+#   climate.STATE_COOL: 'COOL',
+#   climate.STATE_AUTO: 'AUTO',
+#   climate.STATE_ECO: 'ECO',
+#   climate.STATE_IDLE: 'OFF',
+#   climate.STATE_FAN_ONLY: 'OFF',
+#   climate.STATE_DRY: 'OFF',
+
+# These needed to be mapped into HA modes:
+# Off       => OFF      => STATE_IDLE   # Mode_Off: 1,
+# Override  => HEAT     => STATE_HEAT # Mode_Boost: 16,
+# Footprint => ECO      => STATE_ECO    # Mode_Footprint: 4,
+# Timer     => AUTO     => STATE_AUTO   # Mode_Timer: 2,
+# Away                      # Mode_Away: 8,
+#
+OPERATION_LIST = [STATE_IDLE, STATE_HEAT, STATE_ECO, STATE_AUTO]
 
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
@@ -32,17 +48,17 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
         lambda item: item['iType'] == 3, genius_utility.getAllZones())
 
     for zone in climate_list:
-        climate_id, name, current_temperature, set_temperature, mode = genius_utility.GET_CLIMATE(
+        climate_id, name, current_temperature, set_temperature, mode, is_active = genius_utility.GET_CLIMATE(
             zone)
 
         async_add_entities([GeniusClimate(genius_utility, name, climate_id, mode,
-                                          set_temperature, current_temperature)])
+                                          set_temperature, current_temperature, is_active)])
 
 
 class GeniusClimate(ClimateDevice):
     """Representation of a demo climate device."""
 
-    def __init__(self, genius_utility, name, device_id, mode, target_temperature, current_temperature):
+    def __init__(self, genius_utility, name, device_id, mode, target_temperature, current_temperature, is_active):
         """Initialize the climate device."""
         GeniusClimate._genius_utility = genius_utility
         self._name = name.strip()
@@ -52,14 +68,16 @@ class GeniusClimate(ClimateDevice):
         self._current_temperature = current_temperature
         self._device_id = device_id
         self._mode = mode
-
-        if self._mode == "off":
-            self._on = False
-        else:
-            self._on = True
-
+        self._is_active = is_active
         self._operation_list = OPERATION_LIST
-        # ["off", "timer","footprint", "away", "boost", "early"]
+
+    @property
+    def state(self):
+        """Return the current state."""
+        if self._is_active:
+            return STATE_ON
+
+        return STATE_OFF
 
     @property
     def supported_features(self):
@@ -84,87 +102,116 @@ class GeniusClimate(ClimateDevice):
     @property
     def target_temperature(self):
         """Return the temperature we try to reach."""
+
         return self._target_temperature
 
     @property
     def current_operation(self):
         """Return the current operation mode."""
-        """ Map between HA and Genius Hub """
-        # ["off", "timer","footprint", "away", "override", "early"]
-        # OPERATION_LIST = [STATE_HEAT, STATE_ECO, STATE_MANUAL, STATE_OFF, STATE_ON]
-        # "AUTO", "COOL", "ECO", "HEAT", and "OFF"
-        # OPERATION_LIST =[ 'idle', 'cool', 'heat']
-
-        if self._mode == "off":
-            self._on = False
-            return "idle"
-
-        if self._mode == "footprint":
-            self._on = True
-            return "cool"
-
-        if self._mode == "away":
-            self._on = False
-            return "idle"
-
+        # These needed to be mapped into HA modes:
+        # Off       => OFF      => STATE_IDLE   # Mode_Off: 1,
+        # Override  => HEAT     => STATE_HEAT # Mode_Boost: 16,
+        # Footprint => ECO      => STATE_ECO    # Mode_Footprint: 4,
+        # Timer     => AUTO     => STATE_AUTO   # Mode_Timer: 2,
+        # Away                      # Mode_Away: 8,
+        #
+        # OPERATION_LIST = [STATE_IDLE, STATE_HEAT, STATE_ECO, STATE_AUTO]
         if self._mode == "override":
-            self._on = True
-            return "heat"
+            return STATE_HEAT
+        if self._mode == "footprint":
+            return STATE_ECO
+        if self._mode == "timer":
+            return STATE_AUTO
 
-        self._on = True
-        return "heat"
+        return STATE_IDLE
+
+    @property
+    def min_temp(self):
+        return 4.0
+
+    @property
+    def max_temp(self):
+        return 28.0
 
     @property
     def operation_list(self):
         """Return the list of available operation modes."""
         return OPERATION_LIST
 
-    async def async_set_operation_mode(self, operation_mode):
-        """Set new target temperature."""
-        _LOGGER.info("GeniusClimate set operation mode called!")
-        if operation_mode == "idle":
-            self._mode = "off"
-        # elif operation_mode == "heat":
-        #    self._mode = "override"
-        elif operation_mode == "heat":
-            self._mode = "footprint"
-        elif operation_mode == "cool":
-            self._mode = "off"
-        # elif operation_mode == "heat":
-        #    self._mode = "on"
-
-        await GeniusClimate._genius_utility.putjson(self._device_id, '/mode', self._mode)
-
     @property
     def is_on(self):
         """Return true if the device is on."""
-        return self._on
+        if self._mode == "off":
+            return False
+
+        return True
+
+    @property
+    def is_away_mode_on(self):
+        """Return true if away mode is on."""
+        if self._mode == "away":
+            return True
+
+        return False
+
+    async def async_set_operation_mode(self, operation_mode):
+        """Set new target temperature."""
+        _LOGGER.info("GeniusClimate set operation mode called!")
+        _LOGGER.info(operation_mode)
+        # These needed to be mapped into HA modes:
+        # Off       => OFF      => STATE_IDLE   # Mode_Off: 1,
+        # Override  => HEAT     => STATE_HEAT # Mode_Boost: 16,
+        # Footprint => ECO      => STATE_ECO    # Mode_Footprint: 4,
+        # Timer     => AUTO     => STATE_AUTO   # Mode_Timer: 2,
+        # Away                      # Mode_Away: 8,
+        #
+        # OPERATION_LIST = [STATE_IDLE, STATE_HEAT, STATE_ECO, STATE_AUTO]
+        data = {}
+        if operation_mode == STATE_IDLE:
+            self._mode = "off"
+            data = {'iMode': 1}
+        elif operation_mode == STATE_HEAT:
+            self._mode = "override"
+            data = {'iBoostTimeRemaining': 3600, 'iMode': 16,
+                    'fBoostSP': self._target_temperature}
+        elif operation_mode == STATE_ECO:
+            self._mode = "footprint"
+            data = {'iMode': 4}
+        elif operation_mode == STATE_AUTO:
+            self._mode = "timer"
+            data = {'iMode': 2}
+        else:
+            _LOGGER.info("Unknown mode")
+            return
+
+        await GeniusClimate._genius_utility.putjson(self._device_id, data)
 
     async def async_set_temperature(self, **kwargs):
         """Set new target temperatures."""
         _LOGGER.info("GeniusClimate set temperature called!")
         if kwargs.get(ATTR_TEMPERATURE) is not None:
             self._target_temperature = kwargs.get(ATTR_TEMPERATURE)
-            await GeniusClimate._genius_utility.putjson(self._device_id, {'iBoostTimeRemaining': 900, 'fBoostSP': self._target_temperature})
+            await GeniusClimate._genius_utility.putjson(self._device_id, {'iBoostTimeRemaining': 3600, 'fBoostSP': self._target_temperature, 'iMode': 16})
+            self._mode = "override"
 
     async def async_update(self):
         """Get the latest data."""
         _LOGGER.info("GeniusClimate update called!")
         zone = GeniusClimate._genius_utility.getZone(self._device_id)
         if zone:
-            dummy, dummy, self._current_temperature, self._set_temperature, self._mode = GeniusClimate._genius_utility.GET_CLIMATE(
+            dummy, dummy, self._current_temperature, self._set_temperature, self._mode, self._is_active = GeniusClimate._genius_utility.GET_CLIMATE(
                 zone)
-            if self._mode == "off":
-                self._on = False
-            else:
-                self._on = True
+            _LOGGER.info(self._current_temperature,
+                         self._set_temperature, self._mode, self._is_active)
 
     async def async_turn_on(self, **kwargs):
         """Turn on."""
         _LOGGER.info("GeniusClimate turn on called!")
-        await GeniusClimate._genius_utility.putjson(self._device_id, {"fBoostSP": 1, "iBoostTimeRemaining": 900, "iMode": 16})
+        await GeniusClimate._genius_utility.putjson(self._device_id, {"iMode": 2})
+        self._mode = "timer"
 
     async def async_turn_off(self, **kwargs):
         """Turn off."""
         _LOGGER.info("GeniusClimate turn off called!")
         await GeniusClimate._genius_utility.putjson(self._device_id, {"iMode": 1})
+        self._mode = "off"
