@@ -39,7 +39,7 @@ async def async_setup(hass, config):
 
 
 class GeniusUtility():
-
+    
     def __init__(self, ip_address, username, password, update=5):
         ''' if the ip_address == None we assume that the new public API should be used
             if the ip_address is supplied we will use it with the non-public API'''
@@ -96,11 +96,53 @@ class GeniusUtility():
         return GeniusUtility._results['data']
 
     def getZone(self, zoneId):
-        for item in GeniusUtility.getAllZones(self):
-            if item['iID'] == zoneId:
-                return item
+        for zone in GeniusUtility.getAllZones(self):
+            if zone['iID'] == zoneId:
+                return zone
 
         return None
+
+    def getDevice(self, zoneId, addr):
+        for node in self.getZone(zoneId)['nodes']:
+            if node['addr'] == addr:
+                return node['childValues']
+
+        return None
+
+    def getClimateList(self):
+        return self.filterList(3)
+
+    def getSwitchList(self):
+        return self.filterList(2)
+
+    def filterList(self, typeId):
+        this_list = []
+        for item in self.getAllZones():
+            if item['iType'] == typeId:
+                this_list.append(item)
+
+        return this_list
+
+    def filterDeviceList(self, typeId, paramsFunction):
+        this_list = []
+        for zone in self.getAllZones():
+            for node in zone['nodes']:
+                if not node['addr'] == 'WeatherData':
+                    cv = node['childValues']
+                    if typeId in cv:
+                        result = paramsFunction(cv)
+                        result['iID'] = zone['iID']
+                        result['addr'] = node['addr']
+                        result['name'] = zone['strName']
+                        this_list.append(result)
+
+        return this_list
+
+    def getSensorList(self):
+        return self.filterDeviceList('LUMINANCE', self.getSensor)
+
+    def getTRVList(self):
+        return self.filterDeviceList('HEATING_1', self.getTRV)
 
     def LookupStatusError(self, status):
         return {
@@ -144,6 +186,14 @@ class GeniusUtility():
     @staticmethod
     def GET_SWITCH(zone):
         return zone['iID'], zone['strName'], GeniusUtility.GET_MODE(zone)
+
+    @staticmethod
+    def getSensor(cv):
+        return {'Battery': cv['Battery']['val'], 'LUMINANCE': cv['LUMINANCE']['val'], 'Motion': cv['Motion']['val'], 'TEMPERATURE': cv['TEMPERATURE']['val']}
+
+    @staticmethod
+    def getTRV(cv):
+        return {'Battery': cv['Battery']['val'], 'TEMPERATURE': cv['HEATING_1']['val']}
 
     @staticmethod
     def GET_MODE(zone):

@@ -19,8 +19,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     await genius_utility.getjson('/zones')
 
     # Get the zones that are switches
-    switch_list = filter(
-        lambda item: item['iType'] == 2, genius_utility.getAllZones())
+    switch_list = genius_utility.getSwitchList()
 
     for zone in switch_list:
         switch_id, name, mode = genius_utility.GET_SWITCH(zone)

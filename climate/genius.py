@@ -44,8 +44,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     await genius_utility.getjson('/zones')
 
     # Get the zones with a temperature
-    climate_list = filter(
-        lambda item: item['iType'] == 3, genius_utility.getAllZones())
+    climate_list = genius_utility.getClimateList()
 
     for zone in climate_list:
         climate_id, name, current_temperature, set_temperature, mode, is_active = genius_utility.GET_CLIMATE(
@@ -191,8 +190,8 @@ class GeniusClimate(ClimateDevice):
         _LOGGER.info("GeniusClimate set temperature called!")
         if kwargs.get(ATTR_TEMPERATURE) is not None:
             self._target_temperature = kwargs.get(ATTR_TEMPERATURE)
-            await GeniusClimate._genius_utility.putjson(self._device_id, {'iBoostTimeRemaining': 3600, 'fBoostSP': self._target_temperature, 'iMode': 16})
             self._mode = "override"
+            await GeniusClimate._genius_utility.putjson(self._device_id, {'iBoostTimeRemaining': 3600, 'fBoostSP': self._target_temperature, 'iMode': 16})
 
     async def async_update(self):
         """Get the latest data."""
@@ -207,11 +206,11 @@ class GeniusClimate(ClimateDevice):
     async def async_turn_on(self, **kwargs):
         """Turn on."""
         _LOGGER.info("GeniusClimate turn on called!")
-        await GeniusClimate._genius_utility.putjson(self._device_id, {"iMode": 2})
         self._mode = "timer"
+        await GeniusClimate._genius_utility.putjson(self._device_id, {"iMode": 2})
 
     async def async_turn_off(self, **kwargs):
         """Turn off."""
         _LOGGER.info("GeniusClimate turn off called!")
-        await GeniusClimate._genius_utility.putjson(self._device_id, {"iMode": 1})
         self._mode = "off"
+        await GeniusClimate._genius_utility.putjson(self._device_id, {"iMode": 1})
