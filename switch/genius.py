@@ -10,6 +10,7 @@ from homeassistant.components.switch import SwitchDevice
 
 _LOGGER = logging.getLogger(__name__)
 GENIUS_LINK = 'genius_link'
+DEPENDENCIES = ['genius']
 
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
@@ -22,8 +23,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     switch_list = genius_utility.getSwitchList()
 
     for zone in switch_list:
-        switch_id, name, mode = genius_utility.GET_SWITCH(zone)
-        switches.append(GeniusSwitch(genius_utility, switch_id, name, mode))
+        switches.append(GeniusSwitch(genius_utility, zone))
 
     async_add_entities(switches)
 
@@ -31,11 +31,12 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
 class GeniusSwitch(SwitchDevice):
     """ Provides a Genius switch. """
 
-    def __init__(self, genius_utility, device_id, name, state):
+    def __init__(self, genius_utility, zone):
         GeniusSwitch._genius_utility = genius_utility
-        self._name = name.strip()
-        self._device_id = device_id
-        if state == 'off':
+        self._name = zone['name']
+        self._device_id = zone['iID']
+        mode = zone['mode']
+        if mode == 'off':
             self._state = False
         else:
             self._state = True
@@ -52,9 +53,12 @@ class GeniusSwitch(SwitchDevice):
 
     async def async_update(self):
         """Get the latest data."""
+        _LOGGER.info("GeniusClimate update called!")
         zone = GeniusSwitch._genius_utility.getZone(self._device_id)
+        _LOGGER.info(zone)
         if zone:
             mode = GeniusSwitch._genius_utility.GET_MODE(zone)
+            _LOGGER.info(mode)
             if mode == 'off':
                 self._state = False
             else:

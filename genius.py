@@ -39,7 +39,7 @@ async def async_setup(hass, config):
 
 
 class GeniusUtility():
-    
+
     def __init__(self, ip_address, username, password, update=5):
         ''' if the ip_address == None we assume that the new public API should be used
             if the ip_address is supplied we will use it with the non-public API'''
@@ -110,16 +110,19 @@ class GeniusUtility():
         return None
 
     def getClimateList(self):
-        return self.filterList(3)
+        return self.filterList(3, self.GET_CLIMATE)
 
     def getSwitchList(self):
-        return self.filterList(2)
+        return self.filterList(2, self.GET_SWITCH)
 
-    def filterList(self, typeId):
+    def filterList(self, typeId, paramsFunction):
         this_list = []
-        for item in self.getAllZones():
-            if item['iType'] == typeId:
-                this_list.append(item)
+        for zone in self.getAllZones():
+            if zone['iType'] == typeId:
+                result = paramsFunction(zone)
+                result['iID'] = zone['iID']
+                result['name'] = zone['strName'].strip()
+                this_list.append(result)
 
         return this_list
 
@@ -133,7 +136,7 @@ class GeniusUtility():
                         result = paramsFunction(cv)
                         result['iID'] = zone['iID']
                         result['addr'] = node['addr']
-                        result['name'] = zone['strName']
+                        result['name'] = zone['strName'].strip()
                         this_list.append(result)
 
         return this_list
@@ -178,14 +181,11 @@ class GeniusUtility():
 
     @staticmethod
     def GET_CLIMATE(zone):
-        set_temperature = zone["fSP"]
-        current_temperature = zone['fPV']
-        is_active = zone['bIsActive']
-        return zone['iID'], zone['strName'], current_temperature, set_temperature, GeniusUtility.GET_MODE(zone), is_active
+        return {'current_temperature': zone['fPV'], 'target_temperature': zone['fSP'], 'mode': GeniusUtility.GET_MODE(zone), 'is_active': zone['bIsActive']}
 
     @staticmethod
     def GET_SWITCH(zone):
-        return zone['iID'], zone['strName'], GeniusUtility.GET_MODE(zone)
+        return {'mode': GeniusUtility.GET_MODE(zone)}
 
     @staticmethod
     def getSensor(cv):

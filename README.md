@@ -2,15 +2,18 @@
 Here's an integration of Genius Hub (HeatGenius) with Home Assistant (HASS). 
 I have reverted to using the non-public API. This is because I would prefer to talk directly to the hub which is both faster and available when I have an internet outage. This also means, after a firmware update on the hub this component may fail as it did in an earlier version.
 
-It works for reading the temperature from the Genius Hub. Support for switches is included. It does not currently support motion, luminance or setting of temperature or changing any setting in the hub.
+Climate supports controling the heatings
+Switch supports controling the switches
+Sensor reports battery, motion, luminance and temperature values from the sensor or batter and temperature values from the TRV valves.
 
 ## Installation
 ### Adding the Genius Hub Component to Home Assistant
 The **genius.py** files need to be placed in the installation directory of Home Assistant. For me this is
 ```
-/custom_components/climate/genius.py
-/custom_components/switch/genius.py
 /custom_components/genius.py
+/custom_components/climate/genius.py
+/custom_components/sensor/genius.py
+/custom_components/switch/genius.py
 ``` 
 There are instructions to follow on the instructions on the home-assistant website. If you need help, let me know.
 
@@ -29,6 +32,9 @@ climate:
 
 switch:
   - platform: genius
+
+sensor:  
+  - platform: genius
    
 ```
 **username** is mandatory and is the username required to log into your Genius Hub
@@ -44,8 +50,6 @@ switch:
 More information about the Genius Hub can be found here: https://www.geniushub.co.uk/
 
 ## TO DO
-1. Resolve issues in climate for switch between off, timer, boost and footprint so this works with Alexa
-2. Resolve changes to setpoint temperates received from hass
-3. Create docker installer
+1. Create docker installer
 
 Feel free to fork, help and improve
