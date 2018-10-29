@@ -63,12 +63,9 @@ class GeniusSensor(Entity):
 
     async def async_update(self):
         """Get the latest data."""
-        _LOGGER.info("GeniusSensor update called!")
         device = GeniusSensor._genius_utility.getDevice(
             self._device_id, self._device_addr)
-        _LOGGER.info(device)
         data = GeniusSensor._genius_utility.getSensor(device)
-        _LOGGER.info(data)
         self._battery = data['Battery']
         self._temperature = data['TEMPERATURE']
         self._luminance = data['LUMINANCE']
@@ -110,7 +107,6 @@ class GeniusTRV(Entity):
 
     async def async_update(self):
         """Get the latest data."""
-        _LOGGER.info("GeniusTRV update called!")
         device = GeniusSensor._genius_utility.getDevice(
             self._device_id, self._device_addr)
         data = GeniusSensor._genius_utility.getTRV(device)

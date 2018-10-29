@@ -73,8 +73,8 @@ class GeniusUtility():
                     GeniusUtility._results = json.loads(text)
 
         except Exception as ex:
-            _LOGGER.info("Failed requests in getjson")
-            _LOGGER.info(ex)
+            _LOGGER.error("Failed requests in getjson")
+            _LOGGER.error(ex)
             return None
 
     def StartPolling(self):
@@ -86,7 +86,7 @@ class GeniusUtility():
             await self.getjson('/zones')
 
             if not GeniusUtility._STATUS == 200:
-                _LOGGER.info(self.LookupStatusError(GeniusUtility._STATUS))
+                _LOGGER.error(self.LookupStatusError(GeniusUtility._STATUS))
                 if GeniusUtility._STATUS == 501:
                     break
 
@@ -174,9 +174,9 @@ class GeniusUtility():
             return status == 200
 
         except Exception as ex:
-            _LOGGER.info(self.LookupStatusError(GeniusUtility._STATUS))
-            _LOGGER.info("Failed requests in putjson")
-            _LOGGER.info(ex)
+            _LOGGER.error(self.LookupStatusError(GeniusUtility._STATUS))
+            _LOGGER.error("Failed requests in putjson")
+            _LOGGER.error(ex)
             return False
 
     @staticmethod

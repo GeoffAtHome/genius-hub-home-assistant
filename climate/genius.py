@@ -160,8 +160,6 @@ class GeniusClimate(ClimateDevice):
 
     async def async_set_operation_mode(self, operation_mode):
         """Set new target temperature."""
-        _LOGGER.info("GeniusClimate set operation mode called!")
-        _LOGGER.info(operation_mode)
         data = self.GET_OPERARTON_MODE(operation_mode)
         self._mode = data['mode']
         if data['data'] == None:
@@ -172,7 +170,6 @@ class GeniusClimate(ClimateDevice):
 
     async def async_set_temperature(self, **kwargs):
         """Set new target temperatures."""
-        _LOGGER.info("GeniusClimate set temperature called!")
         if kwargs.get(ATTR_TEMPERATURE) is not None:
             self._target_temperature = kwargs.get(ATTR_TEMPERATURE)
             self._mode = "override"
@@ -180,26 +177,20 @@ class GeniusClimate(ClimateDevice):
 
     async def async_update(self):
         """Get the latest data."""
-        _LOGGER.info("GeniusClimate update called!")
         zone = GeniusClimate._genius_utility.getZone(self._device_id)
-        _LOGGER.info(zone)
         if zone:
             zone = GeniusClimate._genius_utility.GET_CLIMATE(zone)
             self._current_temperature = zone['current_temperature']
             self._target_temperature = zone['target_temperature']
             self._mode = zone['mode']
             self._is_active = zone['is_active']
-            _LOGGER.info(self._current_temperature,
-                         self._target_temperature, self._mode, self._is_active)
 
     async def async_turn_on(self, **kwargs):
         """Turn on."""
-        _LOGGER.info("GeniusClimate turn on called!")
         self._mode = "timer"
         await GeniusClimate._genius_utility.putjson(self._device_id, {"iMode": 2})
 
     async def async_turn_off(self, **kwargs):
         """Turn off."""
-        _LOGGER.info("GeniusClimate turn off called!")
         self._mode = "off"
         await GeniusClimate._genius_utility.putjson(self._device_id, {"iMode": 1})

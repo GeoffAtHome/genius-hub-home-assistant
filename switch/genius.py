@@ -53,12 +53,9 @@ class GeniusSwitch(SwitchDevice):
 
     async def async_update(self):
         """Get the latest data."""
-        _LOGGER.info("GeniusClimate update called!")
         zone = GeniusSwitch._genius_utility.getZone(self._device_id)
-        _LOGGER.info(zone)
         if zone:
             mode = GeniusSwitch._genius_utility.GET_MODE(zone)
-            _LOGGER.info(mode)
             if mode == 'off':
                 self._state = False
             else:
