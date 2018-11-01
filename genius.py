@@ -1,5 +1,4 @@
-
-''' This module contains utility functions that are shared across other programs '''
+''' This module connects to the Genius hub and shares the data'''
 import json
 from hashlib import sha256 as hash
 import aiohttp
@@ -13,7 +12,6 @@ from homeassistant.const import (
 from homeassistant.helpers import config_validation as cv
 
 _LOGGER = logging.getLogger(__name__)
-
 GENIUS_LINK = 'genius_link'
 DOMAIN = 'genius'
 
@@ -41,8 +39,6 @@ async def async_setup(hass, config):
 class GeniusUtility():
 
     def __init__(self, ip_address, username, password, update=5):
-        ''' if the ip_address == None we assume that the new public API should be used
-            if the ip_address is supplied we will use it with the non-public API'''
         sha = hash()
         sha.update((username + password).encode('utf-8'))
         GeniusUtility._auth = aiohttp.BasicAuth(
@@ -57,7 +53,8 @@ class GeniusUtility():
 
     async def fetch(self, session, url):
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, auth=GeniusUtility._auth) as response:
+            async with session.get(url,
+                                   auth=GeniusUtility._auth) as response:
                 text = await response.text()
                 return text, response.status
 
@@ -86,7 +83,8 @@ class GeniusUtility():
             await self.getjson('/zones')
 
             if not GeniusUtility._STATUS == 200:
-                _LOGGER.error(self.LookupStatusError(GeniusUtility._STATUS))
+                _LOGGER.error(
+                    self.LookupStatusError(GeniusUtility._STATUS))
                 if GeniusUtility._STATUS == 501:
                     break
 
@@ -147,18 +145,12 @@ class GeniusUtility():
     def getTRVList(self):
         return self.filterDeviceList('HEATING_1', self.getTRV)
 
-    def LookupStatusError(self, status):
-        return {
-            400: "400 The request body or request parameters are invalid.",
-            401: "401 The authorization information is missing or invalid.",
-            404: "404 No zone with the specified ID was not found.",
-            502: "502 The hub is offline.",
-            503: "503 The authorization information invalid.",
-        }.get(status, str(status) + " Unknown status")
-
     async def place(self, session, url, data):
         async with aiohttp.ClientSession() as session:
-            async with session.patch(url, auth=GeniusUtility._auth, data=json.dumps(data)) as response:
+            async with session.patch(
+                    url,
+                    auth=GeniusUtility._auth,
+                    data=json.dumps(data)) as response:
                 assert response.status == 200
                 return response.status
 
@@ -181,7 +173,11 @@ class GeniusUtility():
 
     @staticmethod
     def GET_CLIMATE(zone):
-        return {'current_temperature': zone['fPV'], 'target_temperature': zone['fSP'], 'mode': GeniusUtility.GET_MODE(zone), 'is_active': zone['bIsActive']}
+        return {
+            'current_temperature': zone['fPV'],
+            'target_temperature': zone['fSP'],
+            'mode': GeniusUtility.GET_MODE(zone),
+            'is_active': zone['bIsActive']}
 
     @staticmethod
     def GET_SWITCH(zone):
@@ -189,11 +185,17 @@ class GeniusUtility():
 
     @staticmethod
     def getSensor(cv):
-        return {'Battery': cv['Battery']['val'], 'LUMINANCE': cv['LUMINANCE']['val'], 'Motion': cv['Motion']['val'], 'TEMPERATURE': cv['TEMPERATURE']['val']}
+        return {
+            'Battery': cv['Battery']['val'],
+            'LUMINANCE': cv['LUMINANCE']['val'],
+            'Motion': cv['Motion']['val'],
+            'TEMPERATURE': cv['TEMPERATURE']['val']}
 
     @staticmethod
     def getTRV(cv):
-        return {'Battery': cv['Battery']['val'], 'TEMPERATURE': cv['HEATING_1']['val']}
+        return {
+            'Battery': cv['Battery']['val'],
+            'TEMPERATURE': cv['HEATING_1']['val']}
 
     @staticmethod
     def GET_MODE(zone):
@@ -209,3 +211,13 @@ class GeniusUtility():
         mode_map = {1: "off", 2: "timer", 4: "footprint",
                     8: "away", 16: "boost", 32: "early", }
         return mode_map.get(zone['iMode'], "off")
+
+    @staticmethod
+    def LookupStatusError(status):
+        return {
+            400: "400 The request body or request parameters are invalid.",
+            401: "401 The authorization information is missing or invalid.",
+            404: "404 No zone with the specified ID was not found.",
+            502: "502 The hub is offline.",
+            503: "503 The authorization information invalid.",
+        }.get(status, str(status) + " Unknown status")

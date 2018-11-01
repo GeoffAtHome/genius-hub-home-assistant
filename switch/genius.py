@@ -5,7 +5,6 @@ Implements Genius switches.
 """
 
 import logging
-import asyncio
 from homeassistant.components.switch import SwitchDevice
 
 _LOGGER = logging.getLogger(__name__)
@@ -13,7 +12,8 @@ GENIUS_LINK = 'genius_link'
 DEPENDENCIES = ['genius']
 
 
-async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
+async def async_setup_platform(hass, config,
+                               async_add_entities, discovery_info=None):
     """ Find and return Genius switches """
     switches = []
     genius_utility = hass.data[GENIUS_LINK]
@@ -64,8 +64,13 @@ class GeniusSwitch(SwitchDevice):
     async def async_turn_on(self, **kwargs):
         """ Turn the Genius switch on. """
         duration = 24 * 60 * 60 - (5 * 60)  # 23:55
-        await GeniusSwitch._genius_utility.putjson(self._device_id, {"fBoostSP": 1, "iBoostTimeRemaining": duration, "iMode": 16})
+        await GeniusSwitch._genius_utility.putjson(
+            self._device_id, {
+                "fBoostSP": 1,
+                "iBoostTimeRemaining": duration,
+                "iMode": 16})
 
     async def async_turn_off(self, **kwargs):
         """ Turn the Genius switch off. """
-        await GeniusSwitch._genius_utility.putjson(self._device_id, {"iMode": 1})
+        await GeniusSwitch._genius_utility.putjson(
+            self._device_id, {"iMode": 1})

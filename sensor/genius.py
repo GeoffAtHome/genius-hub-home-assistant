@@ -1,8 +1,7 @@
-
-import asyncio
 import logging
 
-from homeassistant.const import (TEMP_CELSIUS)
+from homeassistant.const import (
+    TEMP_CELSIUS, ATTR_BATTERY_LEVEL, ATTR_TEMPERATURE)
 from homeassistant.helpers.entity import Entity
 
 _LOGGER = logging.getLogger(__name__)
@@ -10,7 +9,8 @@ GENIUS_LINK = 'genius_link'
 DEPENDENCIES = ['genius']
 
 
-async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
+async def async_setup_platform(hass, config,
+                               async_add_entities, discovery_info=None):
     """Set up the Demo climate devices."""
     genius_utility = hass.data[GENIUS_LINK]
     await genius_utility.getjson('/zones')
@@ -25,10 +25,10 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
 
 
 class GeniusSensor(Entity):
-    """Representation of a Sensor."""
+    """Representation of a Wall Sensor."""
 
     def __init__(self, genius_utility, device):
-        """Initialize the sensor."""
+        """Initialize the Wall sensor."""
         GeniusSensor._genius_utility = genius_utility
         self._name = device['name']
         self._device_id = device['iID']
@@ -49,16 +49,23 @@ class GeniusSensor(Entity):
         return self._temperature
 
     @property
-    def unit_of_measurement(self):
-        return TEMP_CELSIUS
+    def device_class(self):
+        """Return the class of this sensor."""
+        return "genius_wall_sensor"
+
+    @property
+    def force_update(self):
+        """Force update."""
+        return True
 
     @property
     def device_state_attributes(self):
         """Return the state attributes."""
         return {
-            'Battery': self._battery,
-            'Luminance': self._luminance,
-            'Motion': self._motion
+            ATTR_BATTERY_LEVEL: self._battery,
+            'luminance': self._luminance,
+            'motion': self._motion,
+            ATTR_TEMPERATURE: self._temperature
         }
 
     async def async_update(self):
@@ -73,10 +80,10 @@ class GeniusSensor(Entity):
 
 
 class GeniusTRV(Entity):
-    """Representation of a Sensor."""
+    """Representation of a TRV Sensor."""
 
     def __init__(self, genius_utility, device):
-        """Initialize the sensor."""
+        """Initialize the TRV sensor."""
         GeniusSensor._genius_utility = genius_utility
         self._name = device['name']
         self._device_id = device['iID']
@@ -95,14 +102,21 @@ class GeniusTRV(Entity):
         return self._temperature
 
     @property
-    def unit_of_measurement(self):
-        return TEMP_CELSIUS
+    def device_class(self):
+        """Return the class of this sensor."""
+        return "genius_trv"
+
+    @property
+    def force_update(self):
+        """Force update."""
+        return True
 
     @property
     def device_state_attributes(self):
         """Return the state attributes."""
         return {
-            'Battery': self._battery
+            ATTR_BATTERY_LEVEL: self._battery,
+            ATTR_TEMPERATURE: self._temperature
         }
 
     async def async_update(self):

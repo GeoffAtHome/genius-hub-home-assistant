@@ -2,13 +2,13 @@
 Genius hub platform that offers reading temperature and valve settings.
 
 """
-
-import asyncio
 import logging
 import voluptuous as vol
 
 from homeassistant.components.climate import (
-    ClimateDevice, STATE_ECO, STATE_HEAT, STATE_AUTO, STATE_IDLE, STATE_OFF, STATE_ON, SUPPORT_TARGET_TEMPERATURE, SUPPORT_OPERATION_MODE, SUPPORT_ON_OFF, SUPPORT_AWAY_MODE)
+    ClimateDevice, STATE_ECO, STATE_HEAT, STATE_AUTO, STATE_IDLE,
+    STATE_OFF, STATE_ON, SUPPORT_TARGET_TEMPERATURE, SUPPORT_OPERATION_MODE,
+    SUPPORT_ON_OFF, SUPPORT_AWAY_MODE)
 
 
 from homeassistant.const import TEMP_CELSIUS, ATTR_TEMPERATURE
@@ -18,7 +18,8 @@ GENIUS_LINK = 'genius_link'
 DEPENDENCIES = ['genius']
 
 
-SUPPORT_FLAGS = SUPPORT_TARGET_TEMPERATURE | SUPPORT_OPERATION_MODE | SUPPORT_ON_OFF | SUPPORT_AWAY_MODE
+SUPPORT_FLAGS = SUPPORT_TARGET_TEMPERATURE | SUPPORT_OPERATION_MODE \
+    | SUPPORT_ON_OFF | SUPPORT_AWAY_MODE
 # Genius supports the operation modes: Off, Override, Footprint and Timer
 # To work with Alexa these MUST BE
 #
@@ -40,7 +41,8 @@ SUPPORT_FLAGS = SUPPORT_TARGET_TEMPERATURE | SUPPORT_OPERATION_MODE | SUPPORT_ON
 OPERATION_LIST = [STATE_IDLE, STATE_HEAT, STATE_ECO, STATE_AUTO]
 
 
-async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
+async def async_setup_platform(hass, config,
+                               async_add_entities, discovery_info=None):
     """Set up the Demo climate devices."""
     genius_utility = hass.data[GENIUS_LINK]
     await genius_utility.getjson('/zones')
@@ -153,16 +155,20 @@ class GeniusClimate(ClimateDevice):
         # OPERATION_LIST = [STATE_IDLE, STATE_HEAT, STATE_ECO, STATE_AUTO]
         operation_mode_map = {
             STATE_IDLE: {'mode': 'off', 'data': {'iMode': 1}},
-            STATE_HEAT: {'mode': 'override', 'data': {'iBoostTimeRemaining': 3600, 'iMode': 16, 'fBoostSP': self._target_temperature}},
+            STATE_HEAT: {'mode': 'override', 'data':
+                         {'iBoostTimeRemaining': 3600,
+                          'iMode': 16,
+                          'fBoostSP': self._target_temperature}},
             STATE_ECO: {'mode': 'footprint', 'data': {'iMode': 4}},
             STATE_AUTO: {'mode': 'timer', 'data': {'iMode': 2}}, }
-        return operation_mode_map.get(operation_mode, {'mode': 'off', 'data': None})
+        return operation_mode_map.get(operation_mode,
+                                      {'mode': 'off', 'data': None})
 
     async def async_set_operation_mode(self, operation_mode):
-        """Set new target temperature."""
+        """Set new operation mode."""
         data = self.GET_OPERARTON_MODE(operation_mode)
         self._mode = data['mode']
-        if data['data'] == None:
+        if data['data'] is None:
             _LOGGER.error("Unknown mode")
             return
 
@@ -173,10 +179,14 @@ class GeniusClimate(ClimateDevice):
         if kwargs.get(ATTR_TEMPERATURE) is not None:
             self._target_temperature = kwargs.get(ATTR_TEMPERATURE)
             self._mode = "override"
-            await GeniusClimate._genius_utility.putjson(self._device_id, {'iBoostTimeRemaining': 3600, 'fBoostSP': self._target_temperature, 'iMode': 16})
+            await GeniusClimate._genius_utility.putjson
+            (self._device_id,
+             {'iBoostTimeRemaining': 3600,
+              'fBoostSP': self._target_temperature,
+              'iMode': 16})
 
     async def async_update(self):
-        """Get the latest data."""
+        """Get the latest data from the hub"""
         zone = GeniusClimate._genius_utility.getZone(self._device_id)
         if zone:
             zone = GeniusClimate._genius_utility.GET_CLIMATE(zone)
@@ -188,9 +198,11 @@ class GeniusClimate(ClimateDevice):
     async def async_turn_on(self, **kwargs):
         """Turn on."""
         self._mode = "timer"
-        await GeniusClimate._genius_utility.putjson(self._device_id, {"iMode": 2})
+        await GeniusClimate._genius_utility.putjson(
+            self._device_id, {"iMode": 2})
 
     async def async_turn_off(self, **kwargs):
         """Turn off."""
         self._mode = "off"
-        await GeniusClimate._genius_utility.putjson(self._device_id, {"iMode": 1})
+        await GeniusClimate._genius_utility.putjson(
+            self._device_id, {"iMode": 1})
