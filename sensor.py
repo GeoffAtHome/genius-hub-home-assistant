@@ -1,47 +1,53 @@
-import logging
+"""
+Supports Genius hub to provide room sensor and TRV information.
 
+For more details about this component, please refer to the documentation at
+https://home-assistant.io/components/sensor.geniushub/
+"""
+from . import GENIUS_HUB                                                         # TODO: remove for official integration
+# from homeassistant.components.geniushub import GENIUS_HUB
 from homeassistant.const import (
-    TEMP_CELSIUS, ATTR_BATTERY_LEVEL, ATTR_TEMPERATURE)
+    ATTR_BATTERY_LEVEL, ATTR_TEMPERATURE)
 from homeassistant.helpers.entity import Entity
 
-_LOGGER = logging.getLogger(__name__)
-GENIUS_LINK = 'genius_link'
-DEPENDENCIES = ['genius']
+DOMAIN = 'geniushub'
 
 
 async def async_setup_platform(hass, config,
                                async_add_entities, discovery_info=None):
     """Set up the Demo climate devices."""
-    genius_utility = hass.data[GENIUS_LINK]
-    await genius_utility.getjson('/zones')
+    genius_hub = hass.data[GENIUS_HUB]
+    await genius_hub.getjson('/zones')
 
     # Get sensors
-    for sensor in genius_utility.getSensorList():
-        async_add_entities([GeniusSensor(genius_utility, sensor)])
+    for sensor in genius_hub.getSensorList():
+        async_add_entities([GeniusSensor(genius_hub, sensor)])
 
     # Get TRVs
-    for trv in genius_utility.getTRVList():
-        async_add_entities([GeniusTRV(genius_utility, trv)])
+    for trv in genius_hub.getTRVList():
+        async_add_entities([GeniusTRV(genius_hub, trv)])
 
 
 class GeniusSensor(Entity):
     """Representation of a Wall Sensor."""
 
-    def __init__(self, genius_utility, device):
+    _genius_hub = None
+
+    def __init__(self, genius_hub, sensor):
         """Initialize the Wall sensor."""
-        GeniusSensor._genius_utility = genius_utility
-        self._name = device['name']
-        self._device_id = device['iID']
-        self._device_addr = device['addr']
-        self._battery = device['Battery']
-        self._temperature = device['TEMPERATURE']
-        self._luminance = device['LUMINANCE']
-        self._motion = device['Motion']
+        GeniusSensor._genius_hub = genius_hub
+        self._name = sensor['name'] + ' sensor ' + str(sensor['index'])
+        self._device_id = sensor['iID']
+        self._device_addr = sensor['addr']
+        self._battery = sensor['Battery']
+        self._temperature = sensor['TEMPERATURE']
+        self._luminance = sensor['LUMINANCE']
+        self._motion = sensor['Motion']
 
     @property
     def name(self):
         """Return the name of the sensor."""
-        return self._name + ":" + self._device_addr
+        return self._name
 
     @property
     def state(self):
@@ -70,9 +76,9 @@ class GeniusSensor(Entity):
 
     async def async_update(self):
         """Get the latest data."""
-        device = GeniusSensor._genius_utility.getDevice(
+        device = GeniusSensor._genius_hub.getDevice(
             self._device_id, self._device_addr)
-        data = GeniusSensor._genius_utility.getSensor(device)
+        data = GeniusSensor._genius_hub.getSensor(device)
         self._battery = data['Battery']
         self._temperature = data['TEMPERATURE']
         self._luminance = data['LUMINANCE']
@@ -82,19 +88,21 @@ class GeniusSensor(Entity):
 class GeniusTRV(Entity):
     """Representation of a TRV Sensor."""
 
-    def __init__(self, genius_utility, device):
+    _genius_hub = None
+
+    def __init__(self, genius_hub, trv):
         """Initialize the TRV sensor."""
-        GeniusSensor._genius_utility = genius_utility
-        self._name = device['name']
-        self._device_id = device['iID']
-        self._device_addr = device['addr']
-        self._battery = device['Battery']
-        self._temperature = device['TEMPERATURE']
+        GeniusTRV._genius_hub = genius_hub
+        self._name = trv['name'] + ' TRV ' + str(trv['index'])
+        self._device_id = trv['iID']
+        self._device_addr = trv['addr']
+        self._battery = trv['Battery']
+        self._temperature = trv['TEMPERATURE']
 
     @property
     def name(self):
         """Return the name of the sensor."""
-        return self._name + ":" + self._device_addr
+        return self._name
 
     @property
     def state(self):
@@ -121,8 +129,8 @@ class GeniusTRV(Entity):
 
     async def async_update(self):
         """Get the latest data."""
-        device = GeniusSensor._genius_utility.getDevice(
+        device = GeniusTRV._genius_hub.getDevice(
             self._device_id, self._device_addr)
-        data = GeniusSensor._genius_utility.getTRV(device)
+        data = GeniusTRV._genius_hub.getTRV(device)
         self._battery = data['Battery']
         self._temperature = data['TEMPERATURE']
